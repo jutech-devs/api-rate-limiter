@@ -2,6 +2,8 @@
 
 Advanced API rate limiting SDK with multiple strategies and React hooks support.
 
+⚠️ **Important:** For server-side usage, ensure you implement per-user rate limiting. See [CRITICAL_PATTERNS.md](./CRITICAL_PATTERNS.md) for essential usage patterns.
+
 ## 🚀 Features
 
 - **Multiple Strategies**: Sliding Window, Fixed Window, Token Bucket

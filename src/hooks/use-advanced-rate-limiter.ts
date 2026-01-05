@@ -1,6 +1,7 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useRateLimiter, UseRateLimiterReturn } from './use-rate-limiter';
-import { RateLimiterConfig } from '../core/types';
+import { RateLimiterConfig, RateLimiterState } from '../core/types';
+import { RateLimiter } from '../core/rate-limiter';
 
 // Hook for API requests with automatic retry
 export function useRateLimitedAPI(config: Partial<RateLimiterConfig> = {}) {
@@ -95,7 +96,8 @@ export function useBatchRateLimiter(config: Partial<RateLimiterConfig> = {}) {
         }
       });
 
-      processQueue();
+      // Don't await processQueue to avoid blocking
+      processQueue().catch(console.error);
     });
   }, [makeRequest]);
 
@@ -135,14 +137,27 @@ export function useBatchRateLimiter(config: Partial<RateLimiterConfig> = {}) {
 
 // Hook for multiple rate limiters (different APIs)
 export function useMultiRateLimiter(configs: Record<string, Partial<RateLimiterConfig>>) {
-  const limitersRef = useRef<Record<string, UseRateLimiterReturn>>({});
+  const limitersRef = useRef<Record<string, RateLimiter>>({});
+  const [states, setStates] = useState<Record<string, RateLimiterState>>({});
 
   // Initialize rate limiters for each API
-  Object.keys(configs).forEach(apiName => {
-    if (!limitersRef.current[apiName]) {
-      limitersRef.current[apiName] = useRateLimiter(configs[apiName]);
-    }
-  });
+  useEffect(() => {
+    const newLimiters: Record<string, RateLimiter> = {};
+    const newStates: Record<string, RateLimiterState> = {};
+    
+    Object.keys(configs).forEach(apiName => {
+      if (!limitersRef.current[apiName]) {
+        newLimiters[apiName] = new RateLimiter(configs[apiName]);
+        newStates[apiName] = newLimiters[apiName].getState();
+      } else {
+        newLimiters[apiName] = limitersRef.current[apiName];
+        newStates[apiName] = limitersRef.current[apiName].getState();
+      }
+    });
+    
+    limitersRef.current = newLimiters;
+    setStates(newStates);
+  }, [configs]);
 
   const makeRequest = useCallback(async <T>(
     apiName: string,
@@ -152,20 +167,30 @@ export function useMultiRateLimiter(configs: Record<string, Partial<RateLimiterC
     if (!limiter) {
       throw new Error(`Rate limiter for API '${apiName}' not found`);
     }
-    return limiter.makeRequest(requestFn);
+    
+    try {
+      const result = await limiter.makeRequest(requestFn);
+      setStates(prev => ({
+        ...prev,
+        [apiName]: limiter.getState()
+      }));
+      return result;
+    } catch (error) {
+      setStates(prev => ({
+        ...prev,
+        [apiName]: limiter.getState()
+      }));
+      throw error;
+    }
   }, []);
 
   const getState = useCallback((apiName: string) => {
-    return limitersRef.current[apiName]?.state;
-  }, []);
+    return states[apiName];
+  }, [states]);
 
   const getAllStates = useCallback(() => {
-    const states: Record<string, any> = {};
-    Object.keys(limitersRef.current).forEach(apiName => {
-      states[apiName] = limitersRef.current[apiName].state;
-    });
     return states;
-  }, []);
+  }, [states]);
 
   return {
     makeRequest,
