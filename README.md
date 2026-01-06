@@ -2,15 +2,21 @@
 
 Advanced API rate limiting SDK with multiple strategies and React hooks support.
 
-⚠️ **Important:** For server-side usage, ensure you implement per-user rate limiting. See [CRITICAL_PATTERNS.md](./CRITICAL_PATTERNS.md) for essential usage patterns.
+⚠️ **Important:** This SDK now supports both **global** and **per-user** rate limiting. Choose the right approach for your use case:
+- **Per-User**: Production APIs, multi-user apps (recommended)
+- **Global**: Internal tools, single-user apps, development
+
+See [PER_USER_GUIDE.md](./PER_USER_GUIDE.md) for professional per-user implementation.
 
 ## 🚀 Features
 
 - **Multiple Strategies**: Sliding Window, Fixed Window, Token Bucket
+- **Global & Per-User**: Choose between global or per-user rate limiting
 - **React Hooks**: Easy integration with React applications
 - **TypeScript**: Full type safety and IntelliSense
 - **Flexible Configuration**: Customizable limits and windows
 - **Advanced Features**: Retry logic, batch processing, multi-API support
+- **Memory Management**: Automatic cleanup for per-user limiters
 - **Zero Dependencies**: Lightweight and fast
 
 ## 📦 Installation
@@ -23,64 +29,82 @@ yarn add @jutech-devs/api-rate-limiter
 
 ## 🎯 Quick Start
 
-### Basic Usage with React Hook
+### Choose Your Approach
+
+#### Per-User Rate Limiting (Recommended for Production)
+
+```tsx
+import { PerUserRateLimiter } from '@jutech-devs/api-rate-limiter';
+
+// Server-side per-user limiting
+const rateLimiter = new PerUserRateLimiter({
+  maxRequests: 100,
+  windowMs: 60000, // 1 minute
+  strategy: 'sliding-window'
+});
+
+app.use('/api/', async (req, res, next) => {
+  const userId = req.user?.id || req.ip;
+  
+  try {
+    await rateLimiter.makeRequest(userId, () => Promise.resolve());
+    next();
+  } catch (error) {
+    res.status(429).json({ error: 'Rate limited' });
+  }
+});
+```
+
+```tsx
+import { usePerUserRateLimiter } from '@jutech-devs/api-rate-limiter';
+
+// React per-user limiting
+function APIComponent() {
+  const { makeRequest, getState } = usePerUserRateLimiter({
+    maxRequests: 10,
+    windowMs: 60000
+  });
+
+  const handleRequest = (userId) => 
+    makeRequest(userId, () => fetch('/api/data'));
+
+  return (
+    <button onClick={() => handleRequest('user123')}>
+      Make Request
+    </button>
+  );
+}
+```
+
+#### Global Rate Limiting (Simple Use Cases)
 
 ```tsx
 import { useRateLimiter } from '@jutech-devs/api-rate-limiter';
 
-function APIComponent() {
-  const { makeRequest, state, canMakeRequest } = useRateLimiter({
+function MyComponent() {
+  const { makeRequest, state } = useRateLimiter({
     maxRequests: 10,
-    windowMs: 60000, // 1 minute
-    strategy: 'sliding-window'
+    windowMs: 60000 // 1 minute
   });
 
-  const fetchData = async () => {
+  const handleClick = async () => {
     try {
-      const result = await makeRequest(() => 
+      const data = await makeRequest(() => 
         fetch('/api/data').then(res => res.json())
       );
-      console.log('Data:', result);
+      console.log(data);
     } catch (error) {
-      console.error('Rate limited:', error.message);
+      console.log('Rate limited!');
     }
   };
 
   return (
     <div>
-      <p>Remaining requests: {state.remaining}</p>
-      <p>Reset time: {new Date(state.resetTime).toLocaleTimeString()}</p>
-      <button onClick={fetchData} disabled={!canMakeRequest()}>
-        Fetch Data
+      <button onClick={handleClick}>
+        Make Request ({state.remaining} left)
       </button>
     </div>
   );
-}
-```
-
-### Vanilla JavaScript Usage
-
-```javascript
-import { RateLimiter } from '@jutech-devs/api-rate-limiter';
-
-const limiter = new RateLimiter({
-  maxRequests: 100,
-  windowMs: 60000,
-  strategy: 'token-bucket'
-});
-
-async function makeAPICall() {
-  try {
-    const result = await limiter.makeRequest(() => 
-      fetch('/api/endpoint').then(res => res.json())
-    );
-    return result;
-  } catch (error) {
-    if (error.name === 'RateLimitError') {
-      console.log(`Rate limited. Retry after ${error.retryAfter}ms`);
-    }
-    throw error;
-  }
 }
 ```
 
@@ -256,16 +280,32 @@ interface RateLimiterState {
 
 ## 🎣 Available Hooks
 
-### `useRateLimiter(config, callbacks)`
+### Per-User Hooks (Production)
+
+#### `usePerUserRateLimiter(config, callbacks)`
+Professional per-user rate limiting with automatic cleanup.
+
+```tsx
+const { makeRequest, getState, getAllStates, activeUserCount } = usePerUserRateLimiter({
+  maxRequests: 100,
+  windowMs: 60000,
+  cleanupInterval: 60000,
+  maxInactiveTime: 3600000
+});
+```
+
+### Global Hooks (Simple Use Cases)
+
+#### `useRateLimiter(config, callbacks)`
 Basic rate limiting hook with full control.
 
-### `useRateLimitedAPI(config)`
+#### `useRateLimitedAPI(config)`
 API requests with automatic retry logic.
 
-### `useBatchRateLimiter(config)`
+#### `useBatchRateLimiter(config)`
 Queue and process requests in batches.
 
-### `useMultiRateLimiter(configs)`
+#### `useMultiRateLimiter(configs)`
 Manage multiple rate limiters for different APIs.
 
 ## 🔄 Callbacks
@@ -335,3 +375,22 @@ Contributions welcome! Please read our contributing guidelines.
 ## 📞 Support
 
 For support, open an issue on GitHub or contact support@jutech-devs.com
+
+## 📚 Documentation
+
+### Getting Started
+- [QUICK_START.md](./QUICK_START.md) - 5-minute setup guide
+- [PER_USER_GUIDE.md](./PER_USER_GUIDE.md) - **Professional per-user implementation**
+- [API_REFERENCE.md](./API_REFERENCE.md) - Complete API documentation
+
+### Advanced Usage
+- [STRATEGIES.md](./STRATEGIES.md) - Rate limiting algorithms explained
+- [EXAMPLES.md](./EXAMPLES.md) - Real-world usage examples
+- [PERFORMANCE.md](./PERFORMANCE.md) - Optimization and benchmarks
+
+### Migration & Troubleshooting
+- [MIGRATION.md](./MIGRATION.md) - Migrate from other libraries
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Common issues and solutions
+- [CRITICAL_PATTERNS.md](./CRITICAL_PATTERNS.md) - Essential usage patterns
+- [COMPARISON.md](./COMPARISON.md) - Library comparison matrix
+- [CODE_VERIFICATION.md](./CODE_VERIFICATION.md) - Implementation verification

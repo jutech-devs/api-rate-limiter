@@ -4,6 +4,34 @@ Complete API documentation for `@jutech-devs/api-rate-limiter`.
 
 ## Core Classes
 
+### PerUserRateLimiter
+
+Professional per-user rate limiting class with automatic cleanup.
+
+```typescript
+class PerUserRateLimiter {
+  constructor(config: PerUserRateLimiterConfig, callbacks?: RateLimiterCallbacks)
+  
+  makeRequest<T>(userId: string, requestFn: () => Promise<T>): Promise<T>
+  canMakeRequest(userId: string): boolean
+  getState(userId: string): RateLimiterState
+  getAllStates(): Record<string, RateLimiterState>
+  reset(userId?: string): void
+  getActiveUserCount(): number
+  destroy(): void
+}
+```
+
+#### Methods
+
+- **`makeRequest(userId, requestFn)`** - Execute a request with per-user rate limiting
+- **`canMakeRequest(userId)`** - Check if user can make a request
+- **`getState(userId)`** - Get rate limiter state for specific user
+- **`getAllStates()`** - Get states for all active users
+- **`reset(userId?)`** - Reset specific user or all users
+- **`getActiveUserCount()`** - Get number of active users
+- **`destroy()`** - Cleanup resources and stop timers
+
 ### RateLimiter
 
 Main rate limiting class for vanilla JavaScript usage.
@@ -41,6 +69,29 @@ class RateLimitError extends Error {
 ```
 
 ## React Hooks
+
+### usePerUserRateLimiter
+
+Professional per-user rate limiting hook with automatic cleanup.
+
+```typescript
+function usePerUserRateLimiter(
+  config: PerUserRateLimiterConfig,
+  callbacks?: RateLimiterCallbacks
+): UsePerUserRateLimiterReturn
+```
+
+**Returns:**
+```typescript
+interface UsePerUserRateLimiterReturn {
+  makeRequest: <T>(userId: string, requestFn: () => Promise<T>) => Promise<T>;
+  canMakeRequest: (userId: string) => boolean;
+  getState: (userId: string) => RateLimiterState;
+  getAllStates: () => Record<string, RateLimiterState>;
+  reset: (userId?: string) => void;
+  activeUserCount: number;
+}
+```
 
 ### useRateLimiter
 
@@ -121,6 +172,15 @@ function useMultiRateLimiter(
 ```
 
 ## Configuration
+
+### PerUserRateLimiterConfig
+
+```typescript
+interface PerUserRateLimiterConfig extends Partial<RateLimiterConfig> {
+  cleanupInterval?: number;    // How often to cleanup inactive users (ms)
+  maxInactiveTime?: number;    // How long to keep inactive users (ms)
+}
+```
 
 ### RateLimiterConfig
 
